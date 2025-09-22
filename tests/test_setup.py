@@ -5,7 +5,7 @@ import niquests as requests
 from unittest.mock import patch, Mock
 
 # Import the function to test
-from ..src.setup import get_access_url
+from setup import get_access_url
 
 def test_get_access_url_success():
     """Test successful exchange of setup token for access URL"""
