@@ -1,20 +1,33 @@
 [project]
 name = "pysimplefin"
 version = "0.1.1"
-description = "Add your description here"
+description = "A python library for accessing simplefin servers"
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.13"
+CLASSIFIERS = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "niquests>=3.15.2",
     "pydantic>=2.11.9",
     "pysimplefin @ file://${PWD}",
 ]
 
-[dependency-groups]
+[project.urls]
+Homepage = "https://github.com/seesteins/pysimplefin"
+Repository = "https://github.com/seesteins/pysimplefin"
+Issues = "https://github.com/seesteins/pysimplefin/issues"
+
+[project.optional-dependencies]
 dev = [
     "pytest>=8.4.1",
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
