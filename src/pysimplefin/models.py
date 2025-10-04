@@ -71,6 +71,7 @@ class Account(BaseModel):
         return v
 
 
+
 class CustomCurrency(BaseModel):
     name: str
     abbr: str

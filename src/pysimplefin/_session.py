@@ -8,7 +8,7 @@ from warnings import warn
 
 from niquests import Session, exceptions, post
 
-from simplefin.models import Account
+from pysimplefin.models import Account
 
 
 @dataclass
@@ -159,6 +159,7 @@ def main():
     hostname = "beta-bridge.simplefin.org"
     path = "/simplefin"
     auth = DefaultAuth(username=user, password=password, hostname=hostname, path=path)
+    auth = DefaultAuth.claim_token("aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS9BNjA1QUE0Q0VFNzNDRTc4Q0IwOUI3MDQ4RDc3MTJGOEIzRjYwQzIzRDQyNTJBNTc2QjM2MzZFNjg1RjlCNDYxQzM4REI2NzQ1Njc3QzI3MDM4MkJBN0IwN0Y2MjQ2MTg5MzdCOEUzNjczMkE4MDU1RUJGODJBODQ3NzVFMUM3Ng==")
     client = SimpleFinClient(auth=auth)
     print(client.info)
 

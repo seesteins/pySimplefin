@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 import pytest
 from niquests import Session, exceptions
 
-from simplefin._session import Auth, DefaultAuth, SimpleFinClient
-from simplefin.models import Account
+from pysimplefin._session import Auth, DefaultAuth, SimpleFinClient
+from pysimplefin.models import Account
 
 
 class TestDefaultAuth:
@@ -77,7 +77,7 @@ class TestDefaultAuth:
         with pytest.raises(ValueError, match="URL missing hostname"):
             DefaultAuth.from_url(url)
 
-    @patch("simplefin._session.post")
+    @patch("pysimplefin._session.post")
     def test_claim_token_success(self, mock_post):
         # Setup
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
@@ -97,7 +97,7 @@ class TestDefaultAuth:
         assert auth.hostname == "api.example.com"
         assert auth.path == "/path"
 
-    @patch("simplefin._session.post")
+    @patch("pysimplefin._session.post")
     def test_claim_token_empty_response(self, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
 
@@ -108,8 +108,8 @@ class TestDefaultAuth:
         with pytest.raises(Exception, match="Empty access URL returned"):
             DefaultAuth.claim_token(setup_token)
 
-    @patch("simplefin._session.post")
-    @patch("simplefin._session.warn")
+    @patch("pysimplefin._session.post")
+    @patch("pysimplefin._session.warn")
     def test_claim_token_403_error(self, mock_warn, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
 
@@ -126,8 +126,8 @@ class TestDefaultAuth:
             "403: Client Error. If this token has not been previously claimed it may be compromised."
         )
 
-    @patch("simplefin._session.post")
-    @patch("simplefin._session.warn")
+    @patch("pysimplefin._session.post")
+    @patch("pysimplefin._session.warn")
     def test_claim_token_other_http_error(self, mock_warn, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
 
@@ -142,8 +142,8 @@ class TestDefaultAuth:
 
         mock_warn.assert_called_once_with(f"HTTP Error occurred: {http_error}")
 
-    @patch("simplefin._session.post")
-    @patch("simplefin._session.warn")
+    @patch("pysimplefin._session.post")
+    @patch("pysimplefin._session.warn")
     def test_claim_token_http_error_no_response(self, mock_warn, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
 
@@ -271,7 +271,7 @@ class TestSimpleFinClient:
         expected_params = {"account": ["acc1", "acc2"]}
         client._session.get.assert_called_once_with("/accounts", params=expected_params)
 
-    @patch("simplefin._session.warn")
+    @patch("pysimplefin._session.warn")
     def test_get_data_with_errors(self, mock_warn, client):
         # Setup
         mock_response = Mock()

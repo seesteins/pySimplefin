@@ -4,7 +4,7 @@ from decimal import Decimal
 from unittest.mock import Mock, patch
 from pydantic import ValidationError
 
-from simplefin.models import (
+from pysimplefin.models import (
     Transaction,
     Organization,
     Account,
@@ -257,7 +257,7 @@ class TestAccount:
         assert account.available_balance == Decimal("75.23")
         assert account.balancedate == datetime.fromtimestamp(978366153)
 
-    @patch('simplefin.models.get')
+    @patch('pysimplefin.models.get')
     def test_account_custom_currency_url_success(self, mock_get, sample_org):
         """Test account with custom currency URL that returns valid data."""
         mock_response = Mock()
@@ -282,7 +282,7 @@ class TestAccount:
         assert account.currency == "Example Airline Miles"
         mock_get.assert_called_once_with("https://www.example.com/flight-miles")
 
-    @patch('simplefin.models.get')
+    @patch('pysimplefin.models.get')
     def test_account_custom_currency_url_failure(self, mock_get, sample_org):
         """Test account with custom currency URL that fails to fetch."""
         mock_get.side_effect = Exception("Network error")
@@ -302,7 +302,7 @@ class TestAccount:
         
         assert "Failed to fetch currency from URL" in str(exc_info.value)
 
-    @patch('simplefin.models.get')
+    @patch('pysimplefin.models.get')
     def test_account_custom_currency_invalid_response(self, mock_get, sample_org):
         """Test account with custom currency URL that returns invalid data."""
         mock_response = Mock()
