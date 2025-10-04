@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Optional, Union
 from urllib.parse import urlparse
 from warnings import warn
+import string
 
 from niquests import Session, exceptions, post
 
@@ -139,10 +140,16 @@ class SimpleFinClient:
         json = response.json()
         errors = json["errors"]
         for error in errors:
-            warn(str(error))  # TODO Sanitize this
+            warn(self.sanitize_error(error))
         accounts = json["accounts"]
         validated_data = [Account.model_validate(account) for account in accounts]
         return validated_data
+    
+    @staticmethod
+    def sanitize_error(error: str):
+        sanitized = str(error).strip()
+        sanitized = ''.join(char for char in sanitized if char in string.printable)
+        return ' '.join(sanitized.split())
 
     @property
     def info(self):
@@ -150,21 +157,3 @@ class SimpleFinClient:
         response = self._session.get("/info")
         response.raise_for_status()
         return response.json()
-
-
-def main():
-    # demo_url = "https://demo:demo@beta-bridge.simplefin.org"
-    user = "demo"
-    password = "demo"
-    hostname = "beta-bridge.simplefin.org"
-    path = "/simplefin"
-    auth = DefaultAuth(username=user, password=password, hostname=hostname, path=path)
-    auth = DefaultAuth.claim_token("aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS9BNjA1QUE0Q0VFNzNDRTc4Q0IwOUI3MDQ4RDc3MTJGOEIzRjYwQzIzRDQyNTJBNTc2QjM2MzZFNjg1RjlCNDYxQzM4REI2NzQ1Njc3QzI3MDM4MkJBN0IwN0Y2MjQ2MTg5MzdCOEUzNjczMkE4MDU1RUJGODJBODQ3NzVFMUM3Ng==")
-    client = SimpleFinClient(auth=auth)
-    print(client.info)
-
-    client._session.close()
-
-
-if __name__ == "__main__":
-    main()

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Any, List
+from warnings import warn
 
 from sqlmodel import Session, SQLModel, create_engine, delete, select, col
 
@@ -30,12 +31,12 @@ class DatabaseManager:
         """Sync data and optionally detect removed transactions"""
         with Session(self.engine) as session:
             for pydantic_account in accounts:
-                # Sync org and account
-                org_data = pydantic_account.org.model_dump(by_alias=True)
+                # Sync org and account - use by_alias=False to get Python field names
+                org_data = pydantic_account.org.model_dump(by_alias=False)
                 org = self._upsert(session, Organization, org_data, "sfinurl")
                 
-                account_data = pydantic_account.model_dump(by_alias=True, exclude={"org", "transactions"})
-                account_data["org_id"] = org.id
+                account_data = pydantic_account.model_dump(by_alias=False, exclude={"org", "transactions"})
+                account_data["org_pk"] = org.pk
                 account = self._upsert(session, Account, account_data, "id")
                 
                 # Remove stale transactions if sync window specified
@@ -55,11 +56,11 @@ class DatabaseManager:
                             delete(Transaction)
                             .where(col(Transaction.id).in_(removed_ids))
                         )
-                        print(f"Removed {len(removed_ids)} transactions from account {account.id}")
+                        warn(f"Removed {len(removed_ids)} transactions from account {account.id}")
                 
                 # Upsert all transactions
                 for txn in pydantic_account.transactions:
-                    txn_data = {**txn.model_dump(by_alias=True), "account_id": account.id}
+                    txn_data = {**txn.model_dump(by_alias=False), "account_id": account.id}
                     self._upsert(session, Transaction, txn_data, "id")
             
             session.commit()
@@ -75,5 +76,4 @@ class DatabaseManager:
     ) -> None:
         """Context manager exit - disposes of database engine"""
         self.engine.dispose()
-
 
