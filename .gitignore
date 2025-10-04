@@ -9,6 +9,11 @@ wheels/
 # Environment files
 *.continue
 *.vscode
+.env
 
 # Virtual environments
 .venv
+
+# Databases
+*.db
+*.sqlite

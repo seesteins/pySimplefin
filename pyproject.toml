@@ -26,6 +26,7 @@ Issues = "https://github.com/seesteins/pysimplefin/issues"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4.1",
+    "python-dotenv",
 ]
 
 [build-system]

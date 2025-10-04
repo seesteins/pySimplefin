@@ -31,11 +31,15 @@ class Transaction(SQLModel, table=True):
 
 
 class Organization(SQLModel, table=True):
-    id: Optional[str] = Field(primary_key=True)
+    # Internal auto-generated primary key
+    pk: Optional[int] = Field(default=None, primary_key=True)
+
+    # SimpleFIN spec fields
     domain: Optional[str] = None
     sfinurl: str = Field(alias="sfin-url")
     name: Optional[str] = None
     url: Optional[str] = None
+    id: Optional[str] = None
 
     # Relationship to accounts
     accounts: List["Account"] = Relationship(back_populates="org")
@@ -45,7 +49,6 @@ class Organization(SQLModel, table=True):
         if not (self.domain or self.name):
             raise ValueError("Either domain or name or both must be provided")
         return self
-
 
 class Account(SQLModel, table=True):
     id: str = Field(primary_key=True)
@@ -60,8 +63,8 @@ class Account(SQLModel, table=True):
     balancedate: datetime = Field(alias="balance-date", sa_column=Column(DateTime))
     extra: Optional[Any] = Field(default=None, sa_column=Column(JSON))
 
-    # Foreign key to organization
-    org_id: str = Field(foreign_key="organization.id")
+    # Foreign key to organization using internal primary key
+    org_pk: int = Field(foreign_key="organization.pk")
     org: Organization = Relationship(back_populates="accounts")
 
     # Relationship to transactions
@@ -92,3 +95,5 @@ class Account(SQLModel, table=True):
 class CustomCurrency(SQLModel):
     name: str
     abbr: str
+
+
