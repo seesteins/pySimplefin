@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
-from typing import Any, List
+from typing import Any, List, Type, TypeVar, Union
 from warnings import warn
 
-from sqlmodel import Session, SQLModel, create_engine, delete, select, col
+from sqlmodel import Session, SQLModel, col, create_engine, delete, select
 
-from .models import Account as PydanticAccount
-from .sql import Account, Organization, Transaction
+from pysimplefin.models import Account as PydanticAccount
+from pysimplefin.sql import Account, Base, Organization, Transaction
+
+# Create a TypeVar bound to Base for better type hints
+BASEMODEL = TypeVar("BASEMODEL", bound=Base)
 
 
 class DatabaseManager:
@@ -13,9 +16,23 @@ class DatabaseManager:
         self.engine = create_engine(database_url)
         SQLModel.metadata.create_all(self.engine)
 
-    def _upsert(self, session: Session, model_class, data: dict, key: str):
-        """Generic upsert using model dumps"""
-        existing = session.get(model_class, data[key])
+    def _upsert(
+        self,
+        session: Session,
+        model_class: Type[BASEMODEL],
+        data: dict,
+        key_fields: Union[str, List[str]],
+    ) -> BASEMODEL:
+        """Generic upsert - key_fields can be string or list"""
+        if isinstance(key_fields, str):
+            key_fields = [key_fields]
+
+        # Build the where conditions
+        query = select(model_class)
+        for field in key_fields:
+            query = query.where(getattr(model_class, field) == data[field])
+
+        existing = session.exec(query).first()
 
         if existing:
             for k, v in data.items():
@@ -31,38 +48,48 @@ class DatabaseManager:
         """Sync data and optionally detect removed transactions"""
         with Session(self.engine) as session:
             for pydantic_account in accounts:
-                # Sync org and account - use by_alias=False to get Python field names
+                # Sync org - use a combination of fields for uniqueness
                 org_data = pydantic_account.org.model_dump(by_alias=False)
+                # Use sfinurl as primary identifier, but could fall back to domain/name combo
                 org = self._upsert(session, Organization, org_data, "sfinurl")
-                
-                account_data = pydantic_account.model_dump(by_alias=False, exclude={"org", "transactions"})
-                account_data["org_pk"] = org.pk
-                account = self._upsert(session, Account, account_data, "id")
-                
+
+                # Sync account - use the internal pk for foreign key
+                account_data = pydantic_account.model_dump(
+                    by_alias=False, exclude={"org", "transactions"}
+                )
+                account_data["org_pk"] = org.pk  # Use internal pk
+                account = self._upsert(session, Account, account_data, ["id", "org_pk"])
+
                 # Remove stale transactions if sync window specified
                 if sync_window_days > 0:
                     remote_txn_ids = {txn.id for txn in pydantic_account.transactions}
                     cutoff_date = datetime.now() - timedelta(days=sync_window_days)
-                    
-                    existing_txn_ids = set(session.exec(
-                        select(Transaction.id)
-                        .where(Transaction.account_id == account.id)
-                        .where(col(Transaction.posted) >= cutoff_date)
-                    ).all())
-                    
+
+                    existing_txn_ids = set(
+                        session.exec(
+                            select(Transaction.id)
+                            .where(Transaction.account_pk == account.pk)
+                            .where(col(Transaction.posted) >= cutoff_date)
+                        ).all()
+                    )
+
                     removed_ids = existing_txn_ids - remote_txn_ids
                     if removed_ids:
                         session.exec(
                             delete(Transaction)
-                            .where(col(Transaction.id).in_(removed_ids))
+                            .where(Transaction.account_pk == account.pk)  # type: ignore[attr-defined]
+                            .where(col(Transaction.id).in_(list(removed_ids)))  # Convert set to list and use col()
                         )
-                        warn(f"Removed {len(removed_ids)} transactions from account {account.id}")
-                
+                        warn(
+                            f"Removed {len(removed_ids)} transactions from account {account.id}"
+                        )
+
                 # Upsert all transactions
                 for txn in pydantic_account.transactions:
-                    txn_data = {**txn.model_dump(by_alias=False), "account_id": account.id}
-                    self._upsert(session, Transaction, txn_data, "id")
-            
+                    txn_data = txn.model_dump(by_alias=False)
+                    txn_data["account_pk"] = account.pk  # Use internal pk
+                    self._upsert(session, Transaction, txn_data, ["id", "account_pk"])
+
             session.commit()
 
     def __enter__(self):
@@ -70,9 +97,9 @@ class DatabaseManager:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,  # Type of exception (if any)
-        exc_val: BaseException | None,  # Exception instance (if any)
-        exc_tb: Any | None,  # Exception traceback (if any)
+        exc_type: type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb: Any | None = None,
     ) -> None:
         """Context manager exit - disposes of database engine"""
         self.engine.dispose()
