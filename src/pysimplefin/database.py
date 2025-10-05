@@ -44,13 +44,19 @@ class DatabaseManager:
         session.flush()
         return new_obj
 
-    def sync(self, accounts: List[PydanticAccount], sync_window_days: int = 7):
+    def sync(
+        self,
+        accounts: List[PydanticAccount],
+        stale_window: int = 7,
+        force_stale: bool = False,
+    ):
         """
         Sync data from a simplefinClient request to a local database.
 
         Args:
             accounts (List[PydanticAccount]): List of pydantic Account models. Can be passed directly from the return of a SimpleFinClient.get_data()
-            sync_window_days (int, optional): Number of days to check for transactions that are no longer in the simplefin dataset. Useful for removing holds, pending charges etc. Defaults to 7.
+            stale_window_days (int, optional): Number of days to check for transactions that are no longer in the simplefin dataset. Useful for removing holds, pending charges etc. Defaults to 7.
+            force_stale (bool, optional): Warning improper use can delete data! Ignore the date range of input data and remove stale transactions. Defaults to False
         """
         with Session(self.engine) as session:
             for pydantic_account in accounts:
@@ -67,30 +73,35 @@ class DatabaseManager:
                 account = self._upsert(session, Account, account_data, ["id", "org_pk"])
 
                 # Remove stale transactions if sync window specified
-                if sync_window_days > 0:
+                if stale_window > 0:
                     remote_txn_ids = {txn.id for txn in pydantic_account.transactions}
-                    cutoff_date = datetime.now() - timedelta(days=sync_window_days)
-
-                    existing_txn_ids = set(
-                        session.exec(
-                            select(Transaction.id)
-                            .where(Transaction.account_pk == account.pk)
-                            .where(col(Transaction.posted) >= cutoff_date)
-                        ).all()
-                    )
-
-                    removed_ids = existing_txn_ids - remote_txn_ids
-                    if removed_ids:
-                        session.exec(
-                            delete(Transaction)
-                            .where(Transaction.account_pk == account.pk)  # type: ignore[attr-defined]
-                            .where(
-                                col(Transaction.id).in_(list(removed_ids))
-                            )  # Convert set to list and use col()
+                    
+                    # Filter out None values and get date boundaries
+                    valid_dates = [txn.posted for txn in pydantic_account.transactions if txn.posted is not None]
+                    
+                    if valid_dates:
+                        dataset_start = min(valid_dates)
+                        
+                        existing_txn_ids = set(
+                            session.exec(
+                                select(Transaction.id)
+                                .where(Transaction.account_pk == account.pk)
+                                .where(col(Transaction.posted) >= dataset_start)
+                            ).all()
                         )
-                        warn(
-                            f"Removed {len(removed_ids)} transactions from account {account.id}"
-                        )
+
+                        removed_ids = existing_txn_ids - remote_txn_ids
+                        if removed_ids:
+                            session.exec(
+                                delete(Transaction)
+                                .where(Transaction.account_pk == account.pk)  # type: ignore[attr-defined]
+                                .where(
+                                    col(Transaction.id).in_(list(removed_ids))
+                                )  # Convert set to list and use col()
+                            )
+                            warn(
+                                f"Removed {len(removed_ids)} transactions from account {account.id}"
+                            )
 
                 # Upsert all transactions
                 for txn in pydantic_account.transactions:
