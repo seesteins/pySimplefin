@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from typing import Any, List, Type, TypeVar, Union
 from warnings import warn
 
@@ -75,13 +74,17 @@ class DatabaseManager:
                 # Remove stale transactions if sync window specified
                 if stale_window > 0:
                     remote_txn_ids = {txn.id for txn in pydantic_account.transactions}
-                    
+
                     # Filter out None values and get date boundaries
-                    valid_dates = [txn.posted for txn in pydantic_account.transactions if txn.posted is not None]
-                    
+                    valid_dates = [
+                        txn.posted
+                        for txn in pydantic_account.transactions
+                        if txn.posted is not None
+                    ]
+
                     if valid_dates:
                         dataset_start = min(valid_dates)
-                        
+
                         existing_txn_ids = set(
                             session.exec(
                                 select(Transaction.id)
