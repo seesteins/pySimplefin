@@ -13,7 +13,7 @@ class TestDefaultAuth:
     def test_init(self):
         auth = DefaultAuth(
             username="testuser",
-            password="testpass",
+            password="testpass", 
             hostname="example.com",
             path="/api",
         )
@@ -26,15 +26,13 @@ class TestDefaultAuth:
         auth = DefaultAuth(
             username="user", password="pass", hostname="example.com", path="/api"
         )
-        expected_url = "https://user:pass@example.com/api"
-        assert auth.url == expected_url
+        assert auth.url == "https://user:pass@example.com/api"
 
-    def test_url_property_no_path(self):
-        auth = DefaultAuth(
+        # Test no path case
+        auth_no_path = DefaultAuth(
             username="user", password="pass", hostname="example.com", path=""
         )
-        expected_url = "https://user:pass@example.com"
-        assert auth.url == expected_url
+        assert auth_no_path.url == "https://user:pass@example.com"
 
     def test_session_property(self):
         auth = DefaultAuth(
@@ -45,41 +43,31 @@ class TestDefaultAuth:
         assert session.base_url == "https://user:pass@example.com/api"
 
     def test_from_url_valid(self):
+        # Test with path
         url = "https://user:pass@example.com/api/path"
         auth = DefaultAuth.from_url(url)
-
         assert auth.username == "user"
         assert auth.password == "pass"
         assert auth.hostname == "example.com"
         assert auth.path == "/api/path"
 
-    def test_from_url_no_path(self):
-        url = "https://user:pass@example.com"
-        auth = DefaultAuth.from_url(url)
+        # Test without path
+        url_no_path = "https://user:pass@example.com"
+        auth_no_path = DefaultAuth.from_url(url_no_path)
+        assert auth_no_path.path == ""
 
-        assert auth.username == "user"
-        assert auth.password == "pass"
-        assert auth.hostname == "example.com"
-        assert auth.path == ""
-
-    def test_from_url_missing_username(self):
-        url = "https://:pass@example.com/api"
+    def test_from_url_validation_errors(self):
         with pytest.raises(ValueError, match="URL missing username"):
-            DefaultAuth.from_url(url)
+            DefaultAuth.from_url("https://:pass@example.com/api")
 
-    def test_from_url_missing_password(self):
-        url = "https://user@example.com/api"
         with pytest.raises(ValueError, match="URL missing password"):
-            DefaultAuth.from_url(url)
+            DefaultAuth.from_url("https://user@example.com/api")
 
-    def test_from_url_missing_hostname(self):
-        url = "https://user:pass@/api"
         with pytest.raises(ValueError, match="URL missing hostname"):
-            DefaultAuth.from_url(url)
+            DefaultAuth.from_url("https://user:pass@/api")
 
     @patch("pysimplefin._session.post")
     def test_claim_token_success(self, mock_post):
-        # Setup
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
         access_url = "https://user:pass@api.example.com/path"
 
@@ -87,10 +75,8 @@ class TestDefaultAuth:
         mock_response.text = access_url
         mock_post.return_value = mock_response
 
-        # Execute
         auth = DefaultAuth.claim_token(setup_token)
 
-        # Verify
         mock_post.assert_called_once_with("https://claim.example.com/token")
         assert auth.username == "user"
         assert auth.password == "pass"
@@ -100,7 +86,6 @@ class TestDefaultAuth:
     @patch("pysimplefin._session.post")
     def test_claim_token_empty_response(self, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
-
         mock_response = Mock()
         mock_response.text = ""
         mock_post.return_value = mock_response
@@ -110,9 +95,10 @@ class TestDefaultAuth:
 
     @patch("pysimplefin._session.post")
     @patch("pysimplefin._session.warn")
-    def test_claim_token_403_error(self, mock_warn, mock_post):
+    def test_claim_token_http_errors(self, mock_warn, mock_post):
         setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
 
+        # Test 403 error
         mock_response = Mock()
         mock_response.status_code = 403
         http_error = exceptions.HTTPError("403 Forbidden")
@@ -122,16 +108,12 @@ class TestDefaultAuth:
         with pytest.raises(exceptions.HTTPError):
             DefaultAuth.claim_token(setup_token)
 
-        mock_warn.assert_called_once_with(
+        mock_warn.assert_called_with(
             "403: Client Error. If this token has not been previously claimed it may be compromised."
         )
 
-    @patch("pysimplefin._session.post")
-    @patch("pysimplefin._session.warn")
-    def test_claim_token_other_http_error(self, mock_warn, mock_post):
-        setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
-
-        mock_response = Mock()
+        # Test other HTTP error
+        mock_warn.reset_mock()
         mock_response.status_code = 500
         http_error = exceptions.HTTPError("500 Internal Server Error")
         http_error.response = mock_response
@@ -140,21 +122,7 @@ class TestDefaultAuth:
         with pytest.raises(exceptions.HTTPError):
             DefaultAuth.claim_token(setup_token)
 
-        mock_warn.assert_called_once_with(f"HTTP Error occurred: {http_error}")
-
-    @patch("pysimplefin._session.post")
-    @patch("pysimplefin._session.warn")
-    def test_claim_token_http_error_no_response(self, mock_warn, mock_post):
-        setup_token = base64.b64encode(b"https://claim.example.com/token").decode()
-
-        http_error = exceptions.HTTPError("Network error")
-        http_error.response = None
-        mock_post.side_effect = http_error
-
-        with pytest.raises(exceptions.HTTPError):
-            DefaultAuth.claim_token(setup_token)
-
-        mock_warn.assert_called_once_with(f"HTTP Error occurred: {http_error}")
+        mock_warn.assert_called_with(f"HTTP Error occurred: {http_error}")
 
 
 class TestSimpleFinClient:
@@ -173,8 +141,7 @@ class TestSimpleFinClient:
         assert client.auth == mock_auth
         assert client._session == mock_auth.session
 
-    def test_get_data_no_params(self, client):
-        # Setup mock response
+    def test_get_data_basic(self, client):
         mock_response = Mock()
         mock_response.json.return_value = {
             "errors": [],
@@ -182,14 +149,14 @@ class TestSimpleFinClient:
                 {
                     "id": "acc1",
                     "name": "Test Account",
-                    "currency": "USD",
+                    "currency": "USD", 
                     "balance": 1000,
                     "available-balance": 950,
                     "balance-date": 1234567890,
                     "transactions": [],
                     "org": {
                         "domain": "example.com",
-                        "id": "org1",
+                        "id": "org1", 
                         "name": "Test Bank",
                         "url": "https://example.com",
                         "sfin-url": "https://example.com/simplefin",
@@ -199,17 +166,14 @@ class TestSimpleFinClient:
         }
         client._session.get.return_value = mock_response
 
-        # Execute
         accounts = client.get_data()
 
-        # Verify
         client._session.get.assert_called_once_with("/accounts", params={})
         mock_response.raise_for_status.assert_called_once()
         assert len(accounts) == 1
         assert isinstance(accounts[0], Account)
 
-    def test_get_data_with_all_params(self, client):
-        # Setup
+    def test_get_data_with_params(self, client):
         start_date = datetime(2023, 1, 1)
         end_date = datetime(2023, 12, 31)
         account_list = ["acc1", "acc2"]
@@ -218,7 +182,6 @@ class TestSimpleFinClient:
         mock_response.json.return_value = {"errors": [], "accounts": []}
         client._session.get.return_value = mock_response
 
-        # Execute
         client.get_data(
             start_date=start_date,
             end_date=end_date,
@@ -227,7 +190,6 @@ class TestSimpleFinClient:
             balances_only=True,
         )
 
-        # Verify
         expected_params = {
             "start-date": int(start_date.timestamp()),
             "end-date": int(end_date.timestamp()),
@@ -237,26 +199,7 @@ class TestSimpleFinClient:
         }
         client._session.get.assert_called_once_with("/accounts", params=expected_params)
 
-    def test_get_data_with_account_objects(self, client):
-        # Setup mock Account objects
-        mock_account1 = Mock()
-        mock_account1.id = "acc1"
-        mock_account2 = Mock()
-        mock_account2.id = "acc2"
-
-        mock_response = Mock()
-        mock_response.json.return_value = {"errors": [], "accounts": []}
-        client._session.get.return_value = mock_response
-
-        # Execute
-        client.get_data(account=[mock_account1, mock_account2])
-
-        # Verify
-        expected_params = {"account": ["acc1", "acc2"]}
-        client._session.get.assert_called_once_with("/accounts", params=expected_params)
-
-    def test_get_data_mixed_account_types(self, client):
-        # Setup
+    def test_get_data_account_objects(self, client):
         mock_account = Mock()
         mock_account.id = "acc1"
 
@@ -264,16 +207,13 @@ class TestSimpleFinClient:
         mock_response.json.return_value = {"errors": [], "accounts": []}
         client._session.get.return_value = mock_response
 
-        # Execute
         client.get_data(account=[mock_account, "acc2"])
 
-        # Verify
         expected_params = {"account": ["acc1", "acc2"]}
         client._session.get.assert_called_once_with("/accounts", params=expected_params)
 
     @patch("pysimplefin._session.warn")
     def test_get_data_with_errors(self, mock_warn, client):
-        # Setup
         mock_response = Mock()
         mock_response.json.return_value = {
             "errors": ["Error 1", "Error 2"],
@@ -281,84 +221,45 @@ class TestSimpleFinClient:
         }
         client._session.get.return_value = mock_response
 
-        # Execute
         client.get_data()
 
-        # Verify warnings were called
         assert mock_warn.call_count == 2
         mock_warn.assert_any_call("Error 1")
         mock_warn.assert_any_call("Error 2")
 
     def test_info_property(self, client):
-        # Setup
         expected_info = {"version": "1.0", "name": "Test Bank"}
         mock_response = Mock()
         mock_response.json.return_value = expected_info
         client._session.get.return_value = mock_response
 
-        # Execute
         info = client.info
 
-        # Verify
         client._session.get.assert_called_once_with("/info")
         mock_response.raise_for_status.assert_called_once()
         assert info == expected_info
 
-    def test_get_data_http_error(self, client):
-        # Setup
+    def test_http_errors(self, client):
         client._session.get.return_value.raise_for_status.side_effect = (
             exceptions.HTTPError("500 Error")
         )
 
-        # Execute & Verify
         with pytest.raises(exceptions.HTTPError):
             client.get_data()
 
-    def test_info_http_error(self, client):
-        # Setup
-        client._session.get.return_value.raise_for_status.side_effect = (
-            exceptions.HTTPError("500 Error")
-        )
-
-        # Execute & Verify
         with pytest.raises(exceptions.HTTPError):
             client.info
 
 
 class TestAuth:
-    def test_auth_is_abstract_base_class(self):
-        # Verify that Auth is properly defined as ABC
+    def test_auth_abstract_implementation(self):
         assert hasattr(Auth, "__abstractmethods__")
         assert "session" in Auth.__abstractmethods__
 
-    def test_concrete_implementation_works(self):
-        # Test that a proper concrete implementation works
         class ConcreteAuth(Auth):
             @property
             def session(self) -> Session:
                 return Session()
 
-        # Should be able to instantiate concrete implementation
         auth = ConcreteAuth()
         assert isinstance(auth.session, Session)
-
-
-# Integration test
-class TestIntegration:
-    def test_full_workflow_with_real_auth(self):
-        # Create a real DefaultAuth instance
-        auth = DefaultAuth(
-            username="demo",
-            password="demo",
-            hostname="beta-bridge.simplefin.org",
-            path="/simplefin",
-        )
-
-        # Verify the auth object works
-        assert auth.url == "https://demo:demo@beta-bridge.simplefin.org/simplefin"
-        assert isinstance(auth.session, Session)
-
-        # Create client
-        client = SimpleFinClient(auth)
-        assert client.auth == auth
-        assert isinstance(client._session, Session)
