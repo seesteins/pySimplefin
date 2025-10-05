@@ -44,8 +44,14 @@ class DatabaseManager:
         session.flush()
         return new_obj
 
-    def sync(self, accounts: List[PydanticAccount], sync_window_days: int = 30):
-        """Sync data and optionally detect removed transactions"""
+    def sync(self, accounts: List[PydanticAccount], sync_window_days: int = 7):
+        """
+        Sync data from a simplefinClient request to a local database.
+
+        Args:
+            accounts (List[PydanticAccount]): List of pydantic Account models. Can be passed directly from the return of a SimpleFinClient.get_data()
+            sync_window_days (int, optional): Number of days to check for transactions that are no longer in the simplefin dataset. Useful for removing holds, pending charges etc. Defaults to 7.
+        """
         with Session(self.engine) as session:
             for pydantic_account in accounts:
                 # Sync org - use a combination of fields for uniqueness
@@ -78,7 +84,9 @@ class DatabaseManager:
                         session.exec(
                             delete(Transaction)
                             .where(Transaction.account_pk == account.pk)  # type: ignore[attr-defined]
-                            .where(col(Transaction.id).in_(list(removed_ids)))  # Convert set to list and use col()
+                            .where(
+                                col(Transaction.id).in_(list(removed_ids))
+                            )  # Convert set to list and use col()
                         )
                         warn(
                             f"Removed {len(removed_ids)} transactions from account {account.id}"
@@ -103,4 +111,3 @@ class DatabaseManager:
     ) -> None:
         """Context manager exit - disposes of database engine"""
         self.engine.dispose()
-
