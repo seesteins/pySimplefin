@@ -51,7 +51,7 @@ class DatabaseManager:
                 # Sync org - use a combination of fields for uniqueness
                 org_data = pydantic_account.org.model_dump(by_alias=False)
                 # Use sfinurl as primary identifier, but could fall back to domain/name combo
-                org = self._upsert(session, Organization, org_data, "sfinurl")
+                org = self._upsert(session, Organization, org_data, ["domain", "name"])
 
                 # Sync account - use the internal pk for foreign key
                 account_data = pydantic_account.model_dump(

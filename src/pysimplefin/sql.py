@@ -54,7 +54,7 @@ class Organization(Base, table=True):
 
     # Create a unique constraint on the combination that makes sense
     __table_args__ = (
-        UniqueConstraint('sfinurl', 'domain', 'name', name='uix_org_identity'),
+        UniqueConstraint('domain', 'name', name='uix_org_identity'),
     )
 
     @model_validator(mode="after")
