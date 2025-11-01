@@ -11,14 +11,14 @@ You'll need to create a simplefin account. The cost is currently $1.50 per month
 Go to your simplefin user page and generate a new claim token
 
 ```python
-from pysimplefin import DefaultAuth
+from pysimplefin import DefaultAuth, SimpleFinClient
 
 auth = DefaultAuth.claim_token("your_token") # This returns a auth object that can be used to generate a client
 print(auth.url) # make sure to save this url. A claim token can only be used once.
 # Get a client to access data.
-client = auth.get_client()
-# Get your transaction data. Will return a list of accounts.
-client.get_data()
+client = SimpleFinClient(auth)
+# Get your transaction data. Will return a list of pydantic account models.
+client.get_data(start_date=datetime.now()-timedelta(days=90), end_date=datetime.now(), pending=True)
 ```
 
 ### Example Usage with a URL
@@ -32,8 +32,8 @@ from pysimplefin import DefaultAuth
 auth = DefaultAuth.from_url("https://user:pass@example_simpfin.tld/path")
 
 # get client and data same as above
-client = auth.get_client()
-client.get_data()
+client = SimpleFinClient(auth)
+data = client.get_data(start_date=datetime.now()-timedelta(days=90), end_date=datetime.now(), pending=True)
 
 # Sync data with a database
 database = DatabaseManager() # Initialize a Database Manager
