@@ -26,7 +26,7 @@ client.get_data(start_date=datetime.now()-timedelta(days=90), end_date=datetime.
 Prior to doing this you'll need to setup connections to a bank or credit card.
 
 ```python
-from pysimplefin import DefaultAuth
+from pysimplefin import DefaultAuth, SimpleFinclient, DatabaseManager
 
 # pass the url generated from your claim token to the DefaultAuth
 auth = DefaultAuth.from_url("https://user:pass@example_simpfin.tld/path")
