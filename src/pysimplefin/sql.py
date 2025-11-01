@@ -21,7 +21,6 @@ class Base(SQLModel):
     pk: Optional[int] = Field(default=None, primary_key=True)
 
 
-
 class Transaction(Base, table=True):
     # SimpleFin spec fields
     id: str
@@ -38,8 +37,9 @@ class Transaction(Base, table=True):
 
     # Ensure combination of SimpleFIN id + account pk is unique
     __table_args__ = (
-        UniqueConstraint('id', 'account_pk', name='uix_transaction_id_account'),
+        UniqueConstraint("id", "account_pk", name="uix_transaction_id_account"),
     )
+
 
 class Organization(Base, table=True):
     # SimpleFIN spec fields
@@ -53,9 +53,7 @@ class Organization(Base, table=True):
     accounts: List["Account"] = Relationship(back_populates="org")
 
     # Create a unique constraint on the combination that makes sense
-    __table_args__ = (
-        UniqueConstraint('domain', 'name', name='uix_org_identity'),
-    )
+    __table_args__ = (UniqueConstraint("domain", "name", name="uix_org_identity"),)
 
     @model_validator(mode="after")
     def domain_or_name(self):
@@ -63,6 +61,9 @@ class Organization(Base, table=True):
             raise ValueError("Either domain or name or both must be provided")
         return self
 
+class CustomCurrency(SQLModel):
+    name: str
+    abbr: str
 
 class Account(Base, table=True):
     # SimpleFin spec fields
@@ -86,9 +87,7 @@ class Account(Base, table=True):
     transactions: List[Transaction] = Relationship(back_populates="account")
 
     # Ensure combination of SimpleFIN id + organization pk is unique
-    __table_args__ = (
-        UniqueConstraint('id', 'org_pk', name='uix_account_id_org'),
-    )
+    __table_args__ = (UniqueConstraint("id", "org_pk", name="uix_account_id_org"),)
 
     @field_validator("currency", mode="before")
     @classmethod
@@ -110,12 +109,3 @@ class Account(Base, table=True):
             except ValidationError:
                 return v
         return v
-
-
-
-
-
-class CustomCurrency(SQLModel):
-    name: str
-    abbr: str
-

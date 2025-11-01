@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-import warnings
 
 import pytest
 from sqlmodel import Session, select
@@ -121,42 +120,78 @@ def test_sync_removes_stale_transactions_realistic(db_manager):
     """Test that stale transactions are removed in a realistic scenario"""
     from datetime import datetime
     from decimal import Decimal
-    
+
     # Create initial data with 3 transactions
-    org = PydanticOrg(domain="example.com", name="Test Bank", **{"sfin-url": "https://example.com/ofx"})
-    
+    org = PydanticOrg(
+        domain="example.com",
+        name="Test Bank",
+        **{"sfin-url": "https://example.com/ofx"},
+    )
+
     initial_transactions = [
-        PydanticTransaction(id="txn1", posted=datetime(2024, 1, 1), amount=Decimal("-10.00"), description="Confirmed payment"),
-        PydanticTransaction(id="txn2", posted=datetime(2024, 1, 2), amount=Decimal("-5.00"), description="Pending charge"),
-        PydanticTransaction(id="txn3", posted=datetime(2024, 1, 3), amount=Decimal("100.00"), description="Deposit"),
+        PydanticTransaction(
+            id="txn1",
+            posted=datetime(2024, 1, 1),
+            amount=Decimal("-10.00"),
+            description="Confirmed payment",
+        ),
+        PydanticTransaction(
+            id="txn2",
+            posted=datetime(2024, 1, 2),
+            amount=Decimal("-5.00"),
+            description="Pending charge",
+        ),
+        PydanticTransaction(
+            id="txn3",
+            posted=datetime(2024, 1, 3),
+            amount=Decimal("100.00"),
+            description="Deposit",
+        ),
     ]
-    
+
     account_data = {
-        "id": "acc1", "name": "Checking", "balance": Decimal("85.00"), "currency": "USD",
-        "org": org, "transactions": initial_transactions, "balance-date": datetime(2024, 1, 3),
+        "id": "acc1",
+        "name": "Checking",
+        "balance": Decimal("85.00"),
+        "currency": "USD",
+        "org": org,
+        "transactions": initial_transactions,
+        "balance-date": datetime(2024, 1, 3),
     }
     initial_account = PydanticAccount(**account_data)
-    
+
     # First sync - all 3 transactions
     db_manager.sync([initial_account])
-    
+
     # Simulate SimpleFin no longer returning the pending charge (txn2)
     # This represents what would happen if a pending charge was cancelled
     updated_transactions = [
-        PydanticTransaction(id="txn1", posted=datetime(2024, 1, 1), amount=Decimal("-10.00"), description="Confirmed payment"),
-        PydanticTransaction(id="txn3", posted=datetime(2024, 1, 3), amount=Decimal("100.00"), description="Deposit"),
+        PydanticTransaction(
+            id="txn1",
+            posted=datetime(2024, 1, 1),
+            amount=Decimal("-10.00"),
+            description="Confirmed payment",
+        ),
+        PydanticTransaction(
+            id="txn3",
+            posted=datetime(2024, 1, 3),
+            amount=Decimal("100.00"),
+            description="Deposit",
+        ),
         # txn2 is no longer in the response from SimpleFin
     ]
-    
+
     updated_account_data = account_data.copy()
     updated_account_data["transactions"] = updated_transactions
-    updated_account_data["balance"] = Decimal("90.00")  # Balance reflects removed pending charge
+    updated_account_data["balance"] = Decimal(
+        "90.00"
+    )  # Balance reflects removed pending charge
     updated_account = PydanticAccount(**updated_account_data)
-    
+
     # Second sync should remove the stale transaction and emit warning
     with pytest.warns(UserWarning, match="Removed \\d+ transactions from account"):
         db_manager.sync([updated_account], stale_window=7)
-    
+
     # Verify only 2 transactions remain
     with Session(db_manager.engine) as session:
         transactions = session.exec(select(Transaction)).all()
