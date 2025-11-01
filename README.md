@@ -1,6 +1,6 @@
 # Pysimplefin
 
-A library to simplify the usage of the simplefin protocol in python. It is built to allow for the syncing of a local database with a remote simplefin server.
+A library to simplify the interaction with a simplefin server in python. It is built to allow for the syncing of a local database with a remote simplefin server. This project has no affiliation with the SimpleFin project.
 
 ## Usage
 
