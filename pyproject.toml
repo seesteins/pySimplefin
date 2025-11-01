@@ -1,6 +1,6 @@
 [project]
 name = "pysimplefin"
-version = "0.1.1"
+version = "0.2"
 description = "A python library for accessing simplefin servers"
 readme = "README.md"
 license = {file = "LICENSE"}

@@ -1,10 +1,10 @@
 # Pysimplefin
 
-A library to simplify the usage of the simplefin protocol in python.
+A library to simplify the usage of the simplefin protocol in python. It is built to allow for the syncing of a local database with a remote simplefin server.
 
 ## Usage
 
-You'll need to create a simplefin account. The cost is currently $1.50 per year. This can be done here <https://beta-bridge.simplefin.org/>.
+You'll need to create a simplefin account. The cost is currently $1.50 per month. This can be done here <https://beta-bridge.simplefin.org/>.
 
 ### Access simplefin with a claim token
 
@@ -21,7 +21,7 @@ client = auth.client
 client.get_data()
 ```
 
-### Access simplefin with a url
+### Example Usage with a URL
 
 Prior to doing this you'll need to setup connections to a bank or credit card.
 
@@ -33,5 +33,9 @@ auth = DefaultAuth.from_url("https://user:pass@example_simpfin.tld/path")
 
 # get client and data same as above
 client = auth.get_client()
-client.get_date()
+client.get_data()
+
+# Sync data with a database
+database = DatabaseManager() # Initialize a Database Manager
+database.sync(data) # Sync the data with the database.
 ```
