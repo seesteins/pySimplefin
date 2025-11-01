@@ -13,10 +13,10 @@ Go to your simplefin user page and generate a new claim token
 ```python
 from simplefin import DefaultAuth
 
-auth = DefaultAuth.claim_token("your_token")
+auth = DefaultAuth.claim_token("your_token") # This returns a auth object that can be used to generate a client
 print(auth.url) # make sure to save this url. A claim token can only be used once.
 # Get a client to access data.
-client = auth.client
+client = auth.get_client()
 # Get your transaction data. Will return a list of accounts.
 client.get_data()
 ```
@@ -28,7 +28,7 @@ Prior to doing this you'll need to setup connections to a bank or credit card.
 ```python
 from simplefin import DefaultAuth
 
-# pass the url generated from your claim token to the DefualtAuth
+# pass the url generated from your claim token to the DefaultAuth
 auth = DefaultAuth.from_url("https://user:pass@example_simpfin.tld/path")
 
 # get client and data same as above
