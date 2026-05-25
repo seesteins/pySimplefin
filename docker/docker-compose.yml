@@ -47,7 +47,7 @@ services:
         source: ./data
         target: /data
       - type: bind
-        source: /tmp/simplefin-webdav
+        source: ./data/exports
         target: /data/exports
         bind:
           propagation: shared
@@ -79,7 +79,7 @@ services:
       --poll-interval 0
     volumes:
       - type: bind
-        source: /tmp/simplefin-webdav
+        source: ./data/exports
         target: /mnt/webdav
         bind:
           propagation: shared
