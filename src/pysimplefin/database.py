@@ -1,5 +1,6 @@
-from typing import Any, List, Type, TypeVar, Union
-from warnings import warn
+import logging
+from datetime import datetime
+from typing import Any, List, Optional, Type, TypeVar, Union
 
 from sqlmodel import Session, SQLModel, col, create_engine, delete, select
 
@@ -7,6 +8,8 @@ from pysimplefin.models import Account as PydanticAccount
 from pysimplefin.sql import Account, Base, Organization, Transaction
 
 # Create a TypeVar bound to Base for better type hints
+logger = logging.getLogger(__name__)
+
 BASEMODEL = TypeVar("BASEMODEL", bound=Base)
 
 
@@ -48,6 +51,7 @@ class DatabaseManager:
         accounts: List[PydanticAccount],
         stale_window: int = 7,
         force_stale: bool = False,
+        start_date: Optional[datetime] = None,
     ):
         """
         Sync data from a simplefinClient request to a local database.
@@ -56,6 +60,7 @@ class DatabaseManager:
             accounts (List[PydanticAccount]): List of pydantic Account models. Can be passed directly from the return of a SimpleFinClient.get_data()
             stale_window_days (int, optional): Number of days to check for transactions that are no longer in the simplefin dataset. Useful for removing holds, pending charges etc. Defaults to 7.
             force_stale (bool, optional): Warning improper use can delete data! Ignore the date range of input data and remove stale transactions. Defaults to False
+            start_date (Optional[datetime], optional): The start date used when fetching transactions. When provided, this is used as the stale-check boundary instead of inferring it from returned transaction dates, preventing older synced transactions from being incorrectly deleted. Defaults to None.
         """
         with Session(self.engine) as session:
             for pydantic_account in accounts:
@@ -83,7 +88,9 @@ class DatabaseManager:
                     ]
 
                     if valid_dates:
-                        dataset_start = min(valid_dates)
+                        dataset_start = (
+                            start_date if start_date is not None else min(valid_dates)
+                        )
 
                         existing_txn_ids = set(
                             session.exec(
@@ -102,8 +109,10 @@ class DatabaseManager:
                                     col(Transaction.id).in_(list(removed_ids))
                                 )  # Convert set to list and use col()
                             )
-                            warn(
-                                f"Removed {len(removed_ids)} transactions from account {account.id}"
+                            logger.warning(
+                                "Removed %d transactions from account %s",
+                                len(removed_ids),
+                                account.id,
                             )
 
                 # Upsert all transactions

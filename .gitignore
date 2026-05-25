@@ -7,10 +7,14 @@ wheels/
 *.egg-info
 .pytest_cache
 
+# Data Directory
+docker/data
+
 # Environment files
 *.continue
 *.vscode
-.env
+*.env
+!example.env
 
 # Virtual environments
 .venv

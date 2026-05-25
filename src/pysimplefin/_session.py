@@ -1,15 +1,18 @@
 import base64
+import logging
+import string
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Union
 from urllib.parse import urlparse
 from warnings import warn
-import string
 
 from niquests import Session, exceptions, post
 
 from pysimplefin.models import Account
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,6 +29,9 @@ class DefaultAuth(Auth):
     password: str
     hostname: str
     path: str
+
+    def __str__(self):
+        return self.url
 
     @property
     def url(self) -> str:
@@ -77,6 +83,8 @@ class DefaultAuth(Auth):
                 warn(
                     "403: Client Error. If this token has not been previously claimed it may be compromised."
                 )
+            if e.response and e.response.status_code == 402:
+                warn("402: Client Error. Payment is required.")
             else:
                 warn(f"HTTP Error occurred: {e}")
             raise e
@@ -86,9 +94,13 @@ class DefaultAuth(Auth):
         return cls.from_url(url=access_url)
 
 
+
+
+
 class SimpleFinClient:
     auth: Auth
     _session: Session
+    SIMPLEFIN_MAX_DAYS = 45
 
     def __init__(self, auth: Auth):
         self.auth = auth
@@ -104,6 +116,11 @@ class SimpleFinClient:
     ) -> List[Account]:
         """Retrieves data from a simplefin /accounts endpoint.
 
+        Requests spanning more than 90 days are automatically split into
+        two recursive halves and the results are merged transparently. Account
+        metadata (balance, balance-date, etc.) is taken from the most recent
+        half; transactions are de-duplicated by id across all chunks.
+
         Args:
             start_date (Optional[datetime], optional): Start date to retrieve transactions. Defaults to None.
             end_date (Optional[datetime], optional): End date to retrieve transactions. This is non-inclusive. Defaults to None.
@@ -113,43 +130,89 @@ class SimpleFinClient:
         Returns:
             List[Account]: Returns a list of accounts that contains all of the associate data. Transactions, Organizations, etc.
         """
-        # Build query parameters
-        params = {}
 
-        if start_date is not None:
-            params["start-date"] = int(start_date.timestamp())
-        if end_date is not None:
-            params["end-date"] = int(end_date.timestamp())
-        if pending:
-            params["pending"] = "1"
-        if account is not None:
-            # Handle both string IDs and Account objects
-            account_ids = []
-            for acc in account:
-                if isinstance(acc, str):
-                    account_ids.append(acc)
-                else:
-                    # Assume it's an Account object with an id attribute
-                    account_ids.append(acc.id)
-            params["account"] = account_ids
-        if balances_only:
-            params["balances-only"] = "1"
+        def merge(left: List[Account], right: List[Account]) -> List[Account]:
+            """Merge two account lists, taking metadata from the right (more recent) side
+            and de-duplicating transactions by id across both."""
+            merged: dict[str, Account] = {acc.id: acc for acc in right}
+            all_transactions: dict[str, dict[str, object]] = {
+                acc_id: {} for acc_id in merged
+            }
+            for chunk in (left, right):
+                for acc in chunk:
+                    if acc.id not in all_transactions:
+                        merged[acc.id] = acc
+                        all_transactions[acc.id] = {}
+                    for txn in acc.transactions:
+                        all_transactions[acc.id][txn.id] = txn
+            return [
+                acc.model_copy(
+                    update={"transactions": list(all_transactions[acc_id].values())}
+                )
+                for acc_id, acc in merged.items()
+            ]
 
-        response = self._session.get("/accounts", params=params)
-        response.raise_for_status()
-        json = response.json()
-        errors = json["errors"]
-        for error in errors:
-            warn(self.sanitize_error(error))
-        accounts = json["accounts"]
-        validated_data = [Account.model_validate(account) for account in accounts]
-        return validated_data
-    
+        effective_end = end_date or datetime.now()
+        effective_start = start_date or effective_end - timedelta(
+            days=self.SIMPLEFIN_MAX_DAYS
+        )
+
+        total_days = (effective_end - effective_start).days
+        if total_days <= self.SIMPLEFIN_MAX_DAYS:
+            # Base case: window fits in a single request
+            logger.info(
+                "Fetching %s -> %s (%d days)",
+                effective_start.date(),
+                effective_end.date(),
+                total_days,
+            )
+            params = {}
+            params["start-date"] = int(effective_start.timestamp())
+            params["end-date"] = int(effective_end.timestamp())
+            if pending:
+                params["pending"] = "1"
+            if account is not None:
+                params["account"] = [
+                    acc if isinstance(acc, str) else acc.id for acc in account
+                ]
+            if balances_only:
+                params["balances-only"] = "1"
+            response = self._session.get("/accounts", params=params)
+            response.raise_for_status()
+            data = response.json()
+            for error in data["errors"]:
+                warn(self.sanitize_error(error))
+            return [Account.model_validate(a) for a in data["accounts"]]
+
+        # Recursive case: split the window in half and merge both sides
+        midpoint = effective_start + (effective_end - effective_start) / 2
+        logger.info(
+            "Request spans %d days; splitting at midpoint %s.",
+            total_days,
+            midpoint.date(),
+        )
+        return merge(
+            self.get_data(
+                start_date=effective_start,
+                end_date=midpoint,
+                pending=pending,
+                account=account,
+                balances_only=balances_only,
+            ),
+            self.get_data(
+                start_date=midpoint,
+                end_date=effective_end,
+                pending=pending,
+                account=account,
+                balances_only=balances_only,
+            ),
+        )
+
     @staticmethod
     def sanitize_error(error: str):
         sanitized = str(error).strip()
-        sanitized = ''.join(char for char in sanitized if char in string.printable)
-        return ' '.join(sanitized.split())
+        sanitized = "".join(char for char in sanitized if char in string.printable)
+        return " ".join(sanitized.split())
 
     @property
     def info(self):

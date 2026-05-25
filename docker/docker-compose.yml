@@ -1,0 +1,90 @@
+services:
+  # Lightweight cron scheduler that manages container lifecycle
+  scheduler:
+    image: mcuadros/ofelia:latest
+    container_name: simplefin-scheduler
+    restart: unless-stopped
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      # job-run spins up a new container on schedule, then removes it when done
+      ofelia.job-run.sync.schedule: "0 6 * * *"          # every day at 06:00 UTC
+      ofelia.job-run.sync.container: simplefin-database-sync
+      ofelia.job-run.export.schedule: "30 6 * * *"
+      ofelia.job-run.export.container: simplefin-csv-export
+
+  # The actual database sync job — built from this repo
+  database-sync:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.sync
+    container_name: simplefin-database-sync
+    env_file:
+      - ./.env
+    environment:
+      - DATABASE_URL=sqlite:////data/simplefin.db
+      - LOOKBACK_DAYS=30
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+    labels:
+      ofelia.enabled: "true"
+
+  # Monthly CSV export job — exports transactions to /data/exports
+  csv-export:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.export
+    container_name: simplefin-csv-export
+    environment:
+      - DATABASE_URL=sqlite:////data/simplefin.db
+      - EXPORT_DIR=/data/exports
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+      - type: bind
+        source: /tmp/simplefin-webdav
+        target: /data/exports
+        bind:
+          propagation: shared
+    depends_on:
+      webdav:
+        condition: service_healthy
+    labels:
+      ofelia.enabled: "true"
+
+  # Rclone sidecar — mounts a WebDAV folder via FUSE
+  webdav:
+    image: rclone/rclone:latest
+    container_name: simplefin-webdav
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    env_file:
+      - ./.env
+    command: >
+      mount webdav: /mnt/webdav
+      --allow-other
+      --allow-non-empty
+      --vfs-cache-mode full
+      --dir-cache-time 30s
+      --poll-interval 0
+    volumes:
+      - type: bind
+        source: /tmp/simplefin-webdav
+        target: /mnt/webdav
+        bind:
+          propagation: shared
+    healthcheck:
+      test: ["CMD", "ls", "/mnt/webdav"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+

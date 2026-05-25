@@ -1,0 +1,24 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy project files
+COPY pyproject.toml uv.lock LICENSE README.md ./
+COPY src/ src/
+
+# Install the project (without dev dependencies)
+RUN uv sync --no-dev --frozen
+
+# Create directories for persistent data
+RUN mkdir -p /data /data/exports
+
+# Copy the entrypoint script
+COPY docker/csv_export.py .
+
+ENV DATABASE_URL="sqlite:////data/simplefin.db"
+ENV EXPORT_DIR="/data/exports"
+
+ENTRYPOINT ["uv", "run", "python", "csv_export.py"]

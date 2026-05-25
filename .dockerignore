@@ -1,0 +1,14 @@
+.git
+.github
+.gitignore
+.python-version
+__pycache__
+*.pyc
+*.pyo
+*.db
+.env
+example.env
+example.py
+example_export.py
+tests/
+get_transactions.sql

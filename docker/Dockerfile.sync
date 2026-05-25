@@ -1,0 +1,23 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy project files
+COPY pyproject.toml uv.lock LICENSE README.md ./
+COPY src/ src/
+
+# Install the project (without dev dependencies)
+RUN uv sync --no-dev --frozen
+
+# Create a directory for persistent data (SQLite DB)
+RUN mkdir -p /data
+
+# Copy the entrypoint script
+COPY docker/database_sync.py .
+
+ENV DATABASE_URL="sqlite:////data/simplefin.db"
+
+ENTRYPOINT ["uv", "run", "python", "database_sync.py"]
