@@ -50,6 +50,7 @@ services:
         source: ./data/exports
         target: /data/exports
         bind:
+          create_host_path: true
           propagation: shared
     depends_on:
       webdav:
@@ -82,6 +83,7 @@ services:
         source: ./data/exports
         target: /mnt/webdav
         bind:
+          create_host_path: true
           propagation: shared
     healthcheck:
       test: ["CMD", "ls", "/mnt/webdav"]
