@@ -67,8 +67,6 @@ services:
       - SYS_ADMIN
     devices:
       - /dev/fuse
-    security_opt:
-      - apparmor:unconfined
     env_file:
       - ./.env
     command: >
