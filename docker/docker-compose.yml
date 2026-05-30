@@ -21,6 +21,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.sync
     container_name: simplefin-database-sync
+    user: "${PUID:-1000}:${PGID:-1000}"
     env_file:
       - ./.env
     environment:
@@ -33,12 +34,15 @@ services:
     labels:
       ofelia.enabled: "true"
 
-  # Monthly CSV export job — exports transactions to /data/exports
+  # Monthly CSV export job — exports transactions to /data/exports then uploads via rclone
   csv-export:
     build:
       context: ..
       dockerfile: docker/Dockerfile.export
     container_name: simplefin-csv-export
+    user: "${PUID:-1000}:${PGID:-1000}"
+    env_file:
+      - ./.env
     environment:
       - DATABASE_URL=sqlite:////data/simplefin.db
       - EXPORT_DIR=/data/exports
@@ -46,46 +50,6 @@ services:
       - type: bind
         source: ./data
         target: /data
-      - type: bind
-        source: ./data/exports
-        target: /data/exports
-        bind:
-          create_host_path: true
-          propagation: shared
-    depends_on:
-      webdav:
-        condition: service_healthy
     labels:
       ofelia.enabled: "true"
-
-  # Rclone sidecar — mounts a WebDAV folder via FUSE
-  webdav:
-    image: rclone/rclone:latest
-    container_name: simplefin-webdav
-    restart: unless-stopped
-    cap_add:
-      - SYS_ADMIN
-    devices:
-      - /dev/fuse
-    env_file:
-      - ./.env
-    command: >
-      mount webdav: /mnt/webdav
-      --allow-other
-      --allow-non-empty
-      --vfs-cache-mode full
-      --dir-cache-time 30s
-      --poll-interval 0
-    volumes:
-      - type: bind
-        source: ./data/exports
-        target: /mnt/webdav
-        bind:
-          create_host_path: true
-          propagation: shared
-    healthcheck:
-      test: ["CMD", "ls", "/mnt/webdav"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 

@@ -1,5 +1,14 @@
 FROM python:3.13-slim
 
+# Install rclone for WebDAV uploads (no FUSE/mount needed)
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+    && curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.zip -o /tmp/rclone.zip \
+    && unzip /tmp/rclone.zip -d /tmp/rclone \
+    && mv /tmp/rclone/*/rclone /usr/local/bin/rclone \
+    && chmod +x /usr/local/bin/rclone \
+    && rm -rf /tmp/rclone /tmp/rclone.zip \
+    && apt-get purge -y curl unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install uv for fast dependency resolution
@@ -12,7 +21,7 @@ COPY src/ src/
 # Install the project (without dev dependencies)
 RUN uv sync --no-dev --frozen
 
-# Create directories for persistent data
+# Create directories for persistent data and exports
 RUN mkdir -p /data /data/exports
 
 # Copy the entrypoint script
@@ -20,5 +29,6 @@ COPY docker/csv_export.py .
 
 ENV DATABASE_URL="sqlite:////data/simplefin.db"
 ENV EXPORT_DIR="/data/exports"
+ENV UV_CACHE_DIR="/tmp/.cache/uv"
 
-ENTRYPOINT ["uv", "run", "python", "csv_export.py"]
+ENTRYPOINT ["/app/.venv/bin/python", "csv_export.py"]

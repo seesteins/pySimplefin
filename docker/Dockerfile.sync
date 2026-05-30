@@ -19,5 +19,6 @@ RUN mkdir -p /data
 COPY docker/database_sync.py .
 
 ENV DATABASE_URL="sqlite:////data/simplefin.db"
+ENV UV_CACHE_DIR="/tmp/.cache/uv"
 
-ENTRYPOINT ["uv", "run", "python", "database_sync.py"]
+ENTRYPOINT ["/app/.venv/bin/python", "database_sync.py"]
