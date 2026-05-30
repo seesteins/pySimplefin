@@ -15,7 +15,7 @@ services:
       ofelia.job-run.export.schedule: "15 */8 * * *"
       ofelia.job-run.export.container: simplefin-csv-export
 
-  # The actual database sync job — built from this repo
+  # Database sync worker
   database-sync:
     build:
       context: ..
@@ -34,7 +34,7 @@ services:
     labels:
       ofelia.enabled: "true"
 
-  # Monthly CSV export job — exports transactions to /data/exports then uploads via rclone
+  # CSV export worker
   csv-export:
     build:
       context: ..
