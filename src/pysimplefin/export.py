@@ -149,6 +149,9 @@ class TransactionExporter:
         content has actually changed.
 
         Files are named ``YYYY-MM.csv`` and placed in *output_dir*.
+        Transactions are bucketed by ``transacted_at`` (the date the
+        transaction actually occurred), falling back to ``posted`` when
+        ``transacted_at`` is absent.
 
         Args:
             output_dir: Directory to write monthly CSV files into.
@@ -170,13 +173,14 @@ class TransactionExporter:
             )
             results = session.exec(query).all()
 
-        # Bucket rows by (year, month) using the posted date
+        # Bucket rows by (year, month) using the transaction date, falling
+        # back to the posted date if transacted_at is absent.
         monthly_buckets: dict[tuple[int, int], list[dict]] = defaultdict(list)
         for transaction, account, org in results:
-            if transaction.posted:
-                key = (transaction.posted.year, transaction.posted.month)
-            elif transaction.transacted_at:
+            if transaction.transacted_at:
                 key = (transaction.transacted_at.year, transaction.transacted_at.month)
+            elif transaction.posted:
+                key = (transaction.posted.year, transaction.posted.month)
             else:
                 # Fallback: bucket under a special "no-date" file
                 key = (0, 0)
