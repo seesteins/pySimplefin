@@ -10,9 +10,9 @@ services:
       - /etc/localtime:/etc/localtime:ro
     labels:
       # job-run spins up a new container on schedule, then removes it when done
-      ofelia.job-run.sync.schedule: "0 */8 * * *"        # every 8 hours (00:00, 08:00, 16:00 UTC)
+      ofelia.job-run.sync.schedule: "0 0 */8 * * *"      # every 8 hours (00:00, 08:00, 16:00 UTC)
       ofelia.job-run.sync.container: simplefin-database-sync
-      ofelia.job-run.export.schedule: "15 */8 * * *"
+      ofelia.job-run.export.schedule: "0 15 */8 * * *"
       ofelia.job-run.export.container: simplefin-csv-export
 
   # Database sync worker
