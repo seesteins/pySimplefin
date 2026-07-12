@@ -41,6 +41,9 @@ services:
       dockerfile: docker/Dockerfile.export
     container_name: simplefin-csv-export
     user: "${PUID:-1000}:${PGID:-1000}"
+    networks:
+      - default
+      - traefik
     env_file:
       - ./.env
     environment:
@@ -53,3 +56,6 @@ services:
     labels:
       ofelia.enabled: "true"
 
+networks:
+  traefik:
+    external: true
